@@ -12,14 +12,15 @@ require "newrelic_plugin"
 module INodeAgent
   class Agent < NewRelic::Plugin::Agent::Base
 
-    agent_guid "com.datazoos.newrelic.plugins.inode_monitor"
-    agent_version "1.0.1"
+    agent_guid "com.tsp.inodes_mon"
+    agent_version "1.0.0"
     agent_config_options :hostname
     agent_human_labels("Inode Agent") { "#{hostname}" }
 
     def poll_cycle        start = `df -i`.gsub('map ', 'map.')
         start = start.gsub('Mounted on', 'Mounted_On')
         result = {}
+        resultpct = []
         disks = start.lines
         headers = disks.to_a.shift()
         headers = headers.split(/[ ]{1,}/)
@@ -31,11 +32,19 @@ module INodeAgent
             i = 0
             headers.each { |header|
                 header = header.gsub(/^%/, 'pct.').gsub(/%$/, '.pct').gsub(/%/, '.pct.').strip()
+                #puts "header: #{header}"
                 result[mountedFrom][header] = line[i].strip().gsub('%', '').strip().gsub(/^\/|\/$/, '')
+                #puts "result: #{result}"
+                if header == "IUse.pct"
+                  resultpct.push(line[i].strip().gsub('%', '').strip().gsub(/^\/|\/$/, '').to_i)
+                end
+                #puts "pct: #{resultpct}"
                 i += 1
             }
         }
-
+        inodesmax = resultpct.max
+        puts "Reporting max inodes usage for 'iNodes/max/#{inodesmax}"
+        report_metric("iNodes/maxpctusage", "Value", inodesmax )
         result.each { | disk, metric |
             metric.each { | k, v|
                 report_metric("iNodes/#{disk}/#{k}",  "#{k}", v)
